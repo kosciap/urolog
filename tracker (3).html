@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Log</title>
+<style>
+  :root {
+    --paper: #F5F2EC;
+    --paper-raised: #FFFFFF;
+    --ink: #23272B;
+    --ink-soft: #6B7075;
+    --line: #E3DED2;
+    --drink: #0EA5E9;
+    --drink-bg: #E0F2FE;
+    --toilet: #1E3A8A;
+    --toilet-bg: #DDE3F0;
+    --danger: #B3261E;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    height: 100%;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  header {
+    padding: 20px 20px 8px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  header h1 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  header .date-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  header button.nav {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--ink-soft);
+    padding: 4px 8px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  header button.nav:disabled { opacity: 0.25; }
+
+  .day-label {
+    min-width: 84px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 14px 20px 6px;
+  }
+
+  .action-btn {
+    border: none;
+    border-radius: 16px;
+    padding: 18px 10px;
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: transform 0.08s ease;
+  }
+  .action-btn:active { transform: scale(0.96); }
+
+  .action-btn .icon { font-size: 26px; }
+
+  .action-btn.drink { background: var(--drink-bg); color: var(--drink); }
+  .action-btn.toilet { background: var(--toilet-bg); color: var(--toilet); }
+
+  .chart-section {
+    padding: 12px 20px 6px;
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .chart-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+  }
+
+  .chart-frame {
+    position: relative;
+  }
+
+  .period-label-overlay {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+
+  .chart-header h2 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  .segmented {
+    display: flex;
+    background: var(--line);
+    border-radius: 100px;
+    padding: 2px;
+  }
+
+  .seg-btn {
+    border: none;
+    background: transparent;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    border-radius: 100px;
+    cursor: pointer;
+  }
+  .seg-btn.active {
+    background: var(--paper-raised);
+    color: var(--ink);
+  }
+
+  .chart-frame {
+    display: flex;
+    align-items: stretch;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 4px 6px;
+  }
+
+  .chart-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .chart-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .legend-swatch.drink { background: var(--drink); }
+  .legend-swatch.toilet { background: var(--toilet); border-radius: 50%; }
+
+  .bar-day {
+    cursor: pointer;
+  }
+  .bar-day.active rect.bar-fill {
+    fill: var(--drink);
+  }
+
+  .timeline {
+    flex: 1;
+    padding: 16px 20px 100px;
+    overflow-y: auto;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin-top: 60px;
+    line-height: 1.6;
+  }
+
+  .entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }
+
+  .entry .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .entry.drink .dot { background: var(--drink); }
+  .entry.toilet .dot { background: var(--toilet); }
+
+  .entry .time {
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    color: var(--ink-soft);
+    width: 52px;
+    flex-shrink: 0;
+  }
+
+  .entry .label {
+    flex: 1;
+    font-size: 15px;
+  }
+
+  .entry .del {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: none;
+    align-items: flex-end;
+    z-index: 10;
+  }
+  .sheet-backdrop.open { display: flex; }
+
+  .sheet {
+    background: var(--paper-raised);
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .sheet h2 {
+    font-size: 16px;
+    margin: 0 0 14px;
+  }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--paper);
+    border-radius: 100px;
+    padding: 9px 16px;
+    font-size: 14px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .chip.selected.drink-type { background: var(--drink-bg); border-color: var(--drink); color: var(--drink); }
+  .chip.selected.toilet-type { background: var(--toilet-bg); border-color: var(--toilet); color: var(--toilet); }
+  .chip.selected.ml-amount { background: var(--drink-bg); border-color: var(--drink); color: var(--drink); }
+
+  .ml-custom {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    font-size: 15px;
+    margin-bottom: 18px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .ml-custom:focus { outline: 2px solid var(--drink); outline-offset: 1px; }
+
+  .sheet-buttons {
+    display: flex;
+    gap: 10px;
+  }
+
+  .sheet-buttons button {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .sheet-buttons .cancel {
+    background: var(--paper);
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+  }
+
+  .sheet-buttons .confirm.drink { background: var(--drink); color: white; }
+  .sheet-buttons .confirm.toilet { background: var(--toilet); color: white; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Log</h1>
+  <div class="date-nav">
+    <button class="nav" id="prevDay">‹</button>
+    <span class="day-label" id="dayLabel">Today</span>
+    <button class="nav" id="nextDay">›</button>
+  </div>
+</header>
+
+<div class="actions">
+  <button class="action-btn drink" id="openDrink">
+    <span class="icon">💧</span> Log a drink
+  </button>
+  <button class="action-btn toilet" id="openToilet">
+    <span class="icon">🚻</span> Log toilet
+  </button>
+</div>
+
+<div class="chart-section">
+  <div class="chart-header">
+    <h2>Overview</h2>
+    <div class="segmented">
+      <button class="seg-btn active" id="segWeek" data-mode="week">Week</button>
+      <button class="seg-btn" id="segMonth" data-mode="month">Month</button>
+    </div>
+  </div>
+  <div class="chart-subheader">
+    <div class="segmented">
+      <button class="seg-btn active" id="segRolling" data-type="rolling">Rolling</button>
+      <button class="seg-btn" id="segCalendar" data-type="calendar">Calendar</button>
+    </div>
+  </div>
+  <div class="chart-frame">
+    <span class="period-label-overlay" id="periodLabel"></span>
+    <svg id="axisLeftSvg"></svg>
+    <div class="chart-scroll">
+      <svg id="chartSvg"></svg>
+    </div>
+    <svg id="axisRightSvg"></svg>
+  </div>
+  <div class="chart-legend">
+    <span><span class="legend-swatch drink"></span>Drank (ml)</span>
+    <span><span class="legend-swatch toilet"></span>Toilet visits</span>
+  </div>
+</div>
+
+<div class="timeline" id="timeline"></div>
+
+<div class="sheet-backdrop" id="drinkSheet">
+  <div class="sheet">
+    <h2>What did you drink?</h2>
+    <div class="chip-row" id="drinkChips">
+      <button class="chip drink-type" data-val="Water">Water</button>
+      <button class="chip drink-type" data-val="Coffee">Coffee</button>
+      <button class="chip drink-type" data-val="Tea">Tea</button>
+      <button class="chip drink-type" data-val="Juice">Juice</button>
+      <button class="chip drink-type" data-val="Soda">Soda</button>
+      <button class="chip drink-type" data-val="Alcohol">Alcohol</button>
+      <button class="chip drink-type" data-val="Other">Other</button>
+    </div>
+    <h2>How much?</h2>
+    <div class="chip-row" id="mlChips">
+      <button class="chip ml-amount" data-val="100">100 ml</button>
+      <button class="chip ml-amount" data-val="150">150 ml</button>
+      <button class="chip ml-amount" data-val="200">200 ml</button>
+      <button class="chip ml-amount" data-val="250">250 ml</button>
+      <button class="chip ml-amount" data-val="330">330 ml</button>
+      <button class="chip ml-amount" data-val="500">500 ml</button>
+    </div>
+    <input type="number" id="mlCustom" class="ml-custom" placeholder="Or type an amount in ml" inputmode="numeric" min="0">
+    <div class="sheet-buttons">
+      <button class="cancel" id="cancelDrink">Cancel</button>
+      <button class="confirm drink" id="confirmDrink">Add</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  const STORAGE_KEY = 'daily_log_entries_v1';
+
+  function loadAll() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveAll(entries) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    } catch (e) {
+      console.error('Could not save', e);
+    }
+  }
+
+  let entries = loadAll();
+  let viewDate = new Date();
+  viewDate.setHours(0,0,0,0);
+
+  function dateKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function formatTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatDayLabel(d) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const yest = new Date(today); yest.setDate(yest.getDate()-1);
+    if (dateKey(d) === dateKey(today)) return 'Today';
+    if (dateKey(d) === dateKey(yest)) return 'Yesterday';
+    return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
+  function entriesForView() {
+    const key = dateKey(viewDate);
+    return entries
+      .filter(e => dateKey(new Date(e.time)) === key)
+      .sort((a,b) => new Date(b.time) - new Date(a.time));
+  }
+
+  let chartMode = 'week';
+  let overviewType = 'rolling';
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function getISOWeek(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    const firstDayNum = (firstThursday.getUTCDay() + 6) % 7;
+    firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNum + 3);
+    return 1 + Math.round((d - firstThursday) / (7 * 24 * 3600 * 1000));
+  }
+
+  function buildDays() {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    if (overviewType === 'rolling') {
+      const numDays = chartMode === 'week' ? 7 : 30;
+      const days = [];
+      for (let i = numDays - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        days.push(d);
+      }
+      return { days, periodLabel: '' };
+    }
+
+    // calendar-aligned
+    if (chartMode === 'week') {
+      const dayOfWeek = (today.getDay() + 6) % 7; // Mon=0..Sun=6
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() - dayOfWeek);
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(d.getDate() + i);
+        days.push(d);
+      }
+      return { days, periodLabel: `Week ${getISOWeek(today)}` };
+    } else {
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const days = [];
+      for (let i = 1; i <= daysInMonth; i++) {
+        days.push(new Date(year, month, i));
+      }
+      const monthName = today.toLocaleDateString([], { month: 'long', year: 'numeric' });
+      return { days, periodLabel: monthName };
+    }
+  }
+
+  function renderChart() {
+    const svg = document.getElementById('chartSvg');
+    const axisLeft = document.getElementById('axisLeftSvg');
+    const axisRight = document.getElementById('axisRightSvg');
+    const { days, periodLabel } = buildDays();
+    const numDays = days.length;
+    const barWidth = chartMode === 'week' ? 20 : 14;
+    const gap = chartMode === 'week' ? 8 : 6;
+    const chartHeight = 140;
+    const topPad = 26;
+    const bottomPad = 22;
+    const axisW = 30;
+    const totalHeight = chartHeight + topPad + bottomPad;
+    const colWidth = barWidth + gap;
+    const plotWidth = colWidth * numDays + gap;
+
+    document.getElementById('periodLabel').textContent = periodLabel;
+
+    const data = days.map(d => {
+      const key = dateKey(d);
+      const dayEntries = entries.filter(e => dateKey(new Date(e.time)) === key);
+      return {
+        date: d,
+        key,
+        ml: dayEntries.filter(e => e.type === 'drink').reduce((sum, e) => sum + (e.amount || 0), 0),
+        toilet: dayEntries.filter(e => e.type === 'toilet').length
+      };
+    });
+
+    const maxMl = Math.max(1, ...data.map(d => d.ml));
+    const maxToilet = Math.max(1, ...data.map(d => d.toilet));
+    const mlAxisMax = Math.max(250, Math.ceil(maxMl / 250) * 250);
+    const toiletAxisMax = Math.max(4, Math.ceil(maxToilet / 2) * 2);
+
+    function axisLabel(target, x, y, text, color, anchor) {
+      const t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('x', x);
+      t.setAttribute('y', y);
+      t.setAttribute('text-anchor', anchor);
+      t.setAttribute('font-size', '10');
+      t.setAttribute('fill', color);
+      t.textContent = text;
+      target.appendChild(t);
+    }
+
+    // --- left axis (ml) ---
+    axisLeft.setAttribute('viewBox', `0 0 ${axisW} ${totalHeight}`);
+    axisLeft.setAttribute('width', axisW);
+    axisLeft.setAttribute('height', totalHeight);
+    axisLeft.innerHTML = '';
+    axisLabel(axisLeft, axisW - 4, 10, 'ml', '#0EA5E9', 'end');
+    axisLabel(axisLeft, axisW - 4, topPad + 4, mlAxisMax, '#0EA5E9', 'end');
+    axisLabel(axisLeft, axisW - 4, topPad + chartHeight / 2 + 3, Math.round(mlAxisMax/2), '#0EA5E9', 'end');
+    axisLabel(axisLeft, axisW - 4, topPad + chartHeight, '0', '#0EA5E9', 'end');
+
+    // --- right axis (toilet count) ---
+    axisRight.setAttribute('viewBox', `0 0 ${axisW} ${totalHeight}`);
+    axisRight.setAttribute('width', axisW);
+    axisRight.setAttribute('height', totalHeight);
+    axisRight.innerHTML = '';
+    axisLabel(axisRight, 4, 10, 'visits', '#1E3A8A', 'start');
+    axisLabel(axisRight, 4, topPad + 4, toiletAxisMax, '#1E3A8A', 'start');
+    axisLabel(axisRight, 4, topPad + chartHeight / 2 + 3, Math.round(toiletAxisMax/2), '#1E3A8A', 'start');
+    axisLabel(axisRight, 4, topPad + chartHeight, '0', '#1E3A8A', 'start');
+
+    // --- scrollable bars + line chart ---
+    svg.setAttribute('viewBox', `0 0 ${plotWidth} ${totalHeight}`);
+    svg.setAttribute('width', plotWidth);
+    svg.setAttribute('height', totalHeight);
+    svg.innerHTML = '';
+
+    // gridlines
+    [topPad, topPad + chartHeight / 2, topPad + chartHeight].forEach(y => {
+      const grid = document.createElementNS(SVG_NS, 'line');
+      grid.setAttribute('x1', 0);
+      grid.setAttribute('x2', plotWidth);
+      grid.setAttribute('y1', y);
+      grid.setAttribute('y2', y);
+      grid.setAttribute('stroke', '#EFEBE2');
+      svg.appendChild(grid);
+    });
+
+    const points = [];
+
+    data.forEach((d, i) => {
+      const x = gap + i * colWidth;
+      const barH = (d.ml / mlAxisMax) * (chartHeight - 10);
+      const y = topPad + chartHeight - barH;
+
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.setAttribute('class', 'bar-day' + (d.key === dateKey(viewDate) ? ' active' : ''));
+      g.setAttribute('data-date', d.key);
+
+      const hit = document.createElementNS(SVG_NS, 'rect');
+      hit.setAttribute('x', x);
+      hit.setAttribute('y', topPad);
+      hit.setAttribute('width', barWidth);
+      hit.setAttribute('height', chartHeight);
+      hit.setAttribute('fill', 'transparent');
+      g.appendChild(hit);
+
+      const rect = document.createElementNS(SVG_NS, 'rect');
+      rect.setAttribute('class', 'bar-fill');
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', barWidth);
+      rect.setAttribute('height', Math.max(barH, 2));
+      rect.setAttribute('rx', chartMode === 'week' ? 6 : 3);
+      rect.setAttribute('fill', d.key === dateKey(viewDate) ? '#0EA5E9' : '#BAE6FD');
+      g.appendChild(rect);
+
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', x + barWidth / 2);
+      label.setAttribute('y', topPad + chartHeight + 16);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-size', chartMode === 'week' ? '11' : '9');
+      label.setAttribute('fill', '#6B7075');
+      label.textContent = chartMode === 'week'
+        ? d.date.toLocaleDateString([], { weekday: 'short' }).slice(0,2)
+        : d.date.getDate();
+      g.appendChild(label);
+
+      const toiletY = topPad + chartHeight - (d.toilet / toiletAxisMax) * (chartHeight - 20) - (d.toilet > 0 ? 4 : 0);
+      points.push({ x: x + barWidth / 2, y: toiletY });
+
+      svg.appendChild(g);
+    });
+
+    if (points.length > 1) {
+      const poly = document.createElementNS(SVG_NS, 'polyline');
+      poly.setAttribute('points', points.map(p => `${p.x},${p.y}`).join(' '));
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', '#1E3A8A');
+      poly.setAttribute('stroke-width', '2');
+      poly.setAttribute('opacity', '0.85');
+      svg.appendChild(poly);
+    }
+    data.forEach((d, i) => {
+      if (d.toilet === 0) return;
+      const p = points[i];
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('cx', p.x);
+      dot.setAttribute('cy', p.y);
+      dot.setAttribute('r', chartMode === 'week' ? 3.5 : 2.5);
+      dot.setAttribute('fill', '#1E3A8A');
+      svg.appendChild(dot);
+    });
+
+    svg.querySelectorAll('.bar-day').forEach(g => {
+      g.addEventListener('click', () => {
+        const [y,m,day] = g.getAttribute('data-date').split('-').map(Number);
+        viewDate = new Date(y, m-1, day);
+        render();
+      });
+    });
+
+    if (chartMode === 'month') {
+      const scrollWrap = svg.closest('.chart-scroll');
+      scrollWrap.scrollLeft = scrollWrap.scrollWidth;
+    }
+  }
+
+  document.getElementById('segWeek').addEventListener('click', () => {
+    chartMode = 'week';
+    document.getElementById('segWeek').classList.add('active');
+    document.getElementById('segMonth').classList.remove('active');
+    renderChart();
+  });
+  document.getElementById('segMonth').addEventListener('click', () => {
+    chartMode = 'month';
+    document.getElementById('segMonth').classList.add('active');
+    document.getElementById('segWeek').classList.remove('active');
+    renderChart();
+  });
+  document.getElementById('segRolling').addEventListener('click', () => {
+    overviewType = 'rolling';
+    document.getElementById('segRolling').classList.add('active');
+    document.getElementById('segCalendar').classList.remove('active');
+    renderChart();
+  });
+  document.getElementById('segCalendar').addEventListener('click', () => {
+    overviewType = 'calendar';
+    document.getElementById('segCalendar').classList.add('active');
+    document.getElementById('segRolling').classList.remove('active');
+    renderChart();
+  });
+
+  function render() {
+    document.getElementById('dayLabel').textContent = formatDayLabel(viewDate);
+    document.getElementById('nextDay').disabled = dateKey(viewDate) === dateKey(new Date());
+
+    renderChart();
+
+    const dayEntries = entriesForView();
+    const timeline = document.getElementById('timeline');
+
+    if (dayEntries.length === 0) {
+      timeline.innerHTML = '<div class="empty-state">Nothing logged yet.<br>Tap a button above to add your first entry.</div>';
+      return;
+    }
+
+    timeline.innerHTML = dayEntries.map(e => `
+      <div class="entry ${e.type}" data-id="${e.id}">
+        <span class="dot"></span>
+        <span class="time">${formatTime(e.time)}</span>
+        <span class="label">${e.label}</span>
+        <button class="del" data-id="${e.id}">×</button>
+      </div>
+    `).join('');
+
+    timeline.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        entries = entries.filter(e => e.id !== id);
+        saveAll(entries);
+        render();
+      });
+    });
+  }
+
+  function addEntry(type, label, amount) {
+    entries.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      type,
+      label,
+      amount: amount || 0,
+      time: new Date().toISOString()
+    });
+    saveAll(entries);
+    render();
+  }
+
+  document.getElementById('prevDay').addEventListener('click', () => {
+    viewDate.setDate(viewDate.getDate() - 1);
+    render();
+  });
+  document.getElementById('nextDay').addEventListener('click', () => {
+    if (dateKey(viewDate) === dateKey(new Date())) return;
+    viewDate.setDate(viewDate.getDate() + 1);
+    render();
+  });
+
+  document.getElementById('openToilet').addEventListener('click', () => {
+    addEntry('toilet', 'Pee');
+  });
+
+  // Drink sheet has its own setup since it needs both a type and an ml amount
+  (function setupDrinkSheet() {
+    const sheet = document.getElementById('drinkSheet');
+    const mlCustom = document.getElementById('mlCustom');
+    let selectedType = null;
+    let selectedMl = null;
+
+    document.getElementById('openDrink').addEventListener('click', () => {
+      selectedType = null;
+      selectedMl = null;
+      mlCustom.value = '';
+      sheet.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      sheet.classList.add('open');
+    });
+    document.getElementById('cancelDrink').addEventListener('click', () => {
+      sheet.classList.remove('open');
+    });
+    sheet.querySelectorAll('#drinkChips .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        sheet.querySelectorAll('#drinkChips .chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        selectedType = chip.getAttribute('data-val');
+      });
+    });
+    sheet.querySelectorAll('#mlChips .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        sheet.querySelectorAll('#mlChips .chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        selectedMl = parseInt(chip.getAttribute('data-val'), 10);
+        mlCustom.value = '';
+      });
+    });
+    mlCustom.addEventListener('input', () => {
+      sheet.querySelectorAll('#mlChips .chip').forEach(c => c.classList.remove('selected'));
+      selectedMl = mlCustom.value ? parseInt(mlCustom.value, 10) : null;
+    });
+    document.getElementById('confirmDrink').addEventListener('click', () => {
+      const type = selectedType || 'Drink';
+      const ml = selectedMl && selectedMl > 0 ? selectedMl : 0;
+      const label = ml > 0 ? `${type} · ${ml} ml` : type;
+      addEntry('drink', label, ml);
+      sheet.classList.remove('open');
+    });
+    sheet.addEventListener('click', (ev) => {
+      if (ev.target === sheet) sheet.classList.remove('open');
+    });
+  })();
+
+  render();
+</script>
+
+</body>
+</html>
